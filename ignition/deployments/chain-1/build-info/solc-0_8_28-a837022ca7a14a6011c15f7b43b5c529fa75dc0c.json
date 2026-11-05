@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-a837022ca7a14a6011c15f7b43b5c529fa75dc0c",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.21.2"
+  },
+  "userSourceNameMap": {
+    "contracts/Voting.sol": "project/contracts/Voting.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Voting.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.28;\r\n/// @title KuraChain - Voting\r\n/// @notice A poll where each wallet can vote once before a deadline.\r\ncontract Voting {\r\n    address public owner;\r\n    string public question;\r\n    uint256 public endTime;\r\n    bool public closed;\r\n    string[] private options;\r\n    mapping(uint256 => uint256) private votes;\r\n    mapping(address => bool) public hasVoted;\r\n    event VoteCast(address indexed voter, uint256 indexed optionIndex);\r\n    event PollClosed(address indexed closedBy);\r\n    modifier onlyOwner() {\r\n        require(msg.sender == owner, \"Only owner\");\r\n        _;\r\n    }\r\n    constructor(\r\n        string memory _question,\r\n        string[] memory _options,\r\n        uint256 _durationSeconds\r\n    ) {\r\n        require(_options.length >= 2 && _options.length <= 10, \"2 to 10 options\");\r\n        require(_durationSeconds > 0, \"Duration must be positive\");\r\n        owner = msg.sender;\r\n        question = _question;\r\n        options = _options;\r\n        endTime = block.timestamp + _durationSeconds;\r\n    }\r\n        /// @notice True while voting is allowed.\r\n    function isOpen() public view returns (bool) {\r\n        return !closed && block.timestamp < endTime;\r\n    }\r\n    /// @notice Cast one vote for the option at optionIndex.\r\n    function vote(uint256 optionIndex) external {\r\n        require(isOpen(), \"Poll is closed\");\r\n        require(!hasVoted[msg.sender], \"Already voted\");\r\n        require(optionIndex < options.length, \"Invalid option\");\r\n        hasVoted[msg.sender] = true;\r\n        votes[optionIndex] += 1;\r\n        emit VoteCast(msg.sender, optionIndex);\r\n    }\r\n    /// @notice Owner can end the poll early.\r\n    function closePoll() external onlyOwner {\r\n        require(isOpen(), \"Poll is closed\");\r\n        closed = true;\r\n        emit PollClosed(msg.sender);\r\n    }\r\n    function getOptions() external view returns (string[] memory) {\r\n        return options;\r\n    }\r\n    /// @notice Vote counts, in the same order as getOptions().\r\n    function getVotes() external view returns (uint256[] memory) {\r\n        uint256[] memory result = new uint256[](options.length);\r\n        for (uint256 i = 0; i < options.length; i++) {\r\n            result[i] = votes[i];\r\n        }\r\n        return result;\r\n    }\r\n}"
+      }
+    }
+  }
+}

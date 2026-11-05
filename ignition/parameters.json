@@ -1,0 +1,7 @@
+{
+  "VotingModule": {
+    "question": "Who should be our class representative and/or President?",
+    "options": ["Alice", "Christine", "Pablo", "Bob"],
+    "durationSeconds": 86400
+  }
+}

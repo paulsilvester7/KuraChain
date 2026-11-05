@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KuraChain</title>
+<link rel="icon" href="data:,">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f4f6f8; color: #222; }
+  .container { width: 90%; max-width: 650px; margin: 40px auto; }
+  .card { background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.08); }
+  h1 { text-align: center; margin: 0; color: #1f3864; }
+  .tagline { text-align: center; color: #666; margin: 6px 0 20px; }
+  button { padding: 12px; border: none; border-radius: 8px; background: #0f9d7a; color: #fff; font-size: 15px; cursor: pointer; }
+  button:hover { background: #0b7f62; }
+  button:disabled { background: #aaa; cursor: not-allowed; }
+  #connectButton, #closeButton { width: 100%; }
+  #closeButton { background: #c0392b; margin-top: 15px; display: none; }
+  .info { padding: 10px; margin-top: 10px; background: #f7f7f7; border-radius: 8px; word-break: break-all; font-size: 13px; }
+  .question { font-size: 22px; font-weight: bold; text-align: center; margin: 25px 0 15px; }
+  .option { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .option .label { flex: 0 0 110px; font-weight: bold; word-break: break-word; }
+  .bar { flex: 1; background: #eee; border-radius: 6px; height: 22px; overflow: hidden; }
+  .fill { height: 100%; background: #0f9d7a; width: 0; transition: width 0.4s; }
+  .count { flex: 0 0 70px; text-align: right; font-size: 13px; }
+  .status { margin-top: 20px; padding: 12px; border-radius: 8px; background: #eee; text-align: center; word-break: break-word; }
+</style>
+</head>
+<body>
+<div class="container"><div class="card">
+  <h1>KuraChain</h1>
+  <p class="tagline">One wallet, one vote, recorded on Ethereum</p>
+  <button id="connectButton">Connect MetaMask</button>
+  <div id="walletAddress" class="info">Wallet: Not connected</div>
+  <div id="network" class="info">Network: Not connected</div>
+  <div id="pollState" class="info">Poll: --</div>
+  <div id="question" class="question">--</div>
+  <div id="options"></div>
+  <button id="closeButton">Close poll (owner only)</button>
+  <div id="status" class="status">Connect MetaMask to begin.</div>
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+<script>
+// ===== 1. SETTINGS: paste YOUR deployed contract address =====
+const CONTRACT_ADDRESS = "0x92Dc4D4a5A61Bb91542eA3E7A3e5921F702cC9Af";
+const SUPPORTED_CHAINS = { "11155111": "Sepolia", "31337": "Hardhat Local" };
+
+// ===== 2. ABI (human-readable form, only what the page uses) =====
+const ABI = [
+  "function question() view returns (string)",
+  "function getOptions() view returns (string[])",
+  "function getVotes() view returns (uint256[])",
+  "function hasVoted(address) view returns (bool)",
+  "function isOpen() view returns (bool)",
+  "function endTime() view returns (uint256)",
+  "function owner() view returns (address)",
+  "function vote(uint256 optionIndex)",
+  "function closePoll()"
+];
+
+// ===== 3. VARIABLES AND HELPERS =====
+let provider, signer, contract, chainId, account;
+const $ = (id) => document.getElementById(id);
+function setStatus(m) { $("status").textContent = m; }
+function errMsg(e) { return (e && (e.reason || e.shortMessage || e.message)) || "Unknown error"; }
+
+// ===== 4. CONNECT =====
+async function connectWallet() {
+  try {
+    if (!window.ethereum) { setStatus("MetaMask is not installed."); return; }
+    if (!ethers.isAddress(CONTRACT_ADDRESS)) { setStatus("0x92Dc4D4a5A61Bb91542eA3E7A3e5921F702cC9Af"); return; }
+    await window.ethereum.request({ method: "eth_requestAccounts" });
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+    account = await signer.getAddress();
+    $("walletAddress").textContent = "Wallet: " + account;
+
+    chainId = (await provider.getNetwork()).chainId.toString();
+    if (!SUPPORTED_CHAINS[chainId]) {
+      $("network").textContent = "Network: Wrong network (chain " + chainId + ")";
+      setStatus("Please switch MetaMask to Sepolia.");
+      return;
+    }
+    $("network").textContent = "Network: " + SUPPORTED_CHAINS[chainId];
+    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+    $("connectButton").textContent = "MetaMask Connected";
+    await refresh();
+    setStatus("Wallet connected successfully.");
+  } catch (e) { console.error(e); setStatus("Connection failed: " + errMsg(e)); }
+}
+
+// ===== 5. READ (free, no pop-up) =====
+async function refresh() {
+  const [question, options, votes, voted, open, end, owner] = await Promise.all([
+    contract.question(), contract.getOptions(), contract.getVotes(),
+    contract.hasVoted(account), contract.isOpen(), contract.endTime(), contract.owner()
+  ]);
+  $("question").textContent = question;
+  $("pollState").textContent = open
+    ? "Poll: OPEN until " + new Date(Number(end) * 1000).toLocaleString()
+    : "Poll: CLOSED";
+  const total = votes.reduce((a, v) => a + v, 0n);
+  const box = $("options");
+  box.replaceChildren();
+
+  options.forEach((name, i) => {
+    const pct = total === 0n ? 0 : Number((votes[i] * 100n) / total);
+    const row = document.createElement("div"); row.className = "option";
+    const label = document.createElement("div"); label.className = "label"; label.textContent = name;
+    const bar = document.createElement("div"); bar.className = "bar";
+    const fill = document.createElement("div"); fill.className = "fill"; fill.style.width = pct + "%";
+    bar.appendChild(fill);
+    const count = document.createElement("div"); count.className = "count";
+    count.textContent = votes[i].toString() + " (" + pct + "%)";
+    const btn = document.createElement("button"); btn.textContent = "Vote";
+    btn.disabled = voted || !open;
+    btn.addEventListener("click", () => castVote(i));
+    row.append(label, bar, count, btn);
+    box.appendChild(row);
+  });
+
+  $("closeButton").style.display =
+    open && owner.toLowerCase() === account.toLowerCase() ? "block" : "none";
+  if (voted) setStatus("You have already voted with this wallet.");
+}
+
+// ===== 6. WRITE (transactions: MetaMask confirmation + gas) =====
+async function castVote(index) {
+  try {
+    setStatus("Waiting for MetaMask confirmation...");
+    const tx = await contract.vote(index);
+    setStatus("Vote submitted. Waiting for confirmation...");
+    await tx.wait();
+    await refresh();
+    const link = chainId === "11155111" ? " View: https://sepolia.etherscan.io/tx/" + tx.hash : "";
+    setStatus("Vote recorded!" + link);
+  } catch (e) { console.error(e); setStatus("Vote failed: " + errMsg(e)); }
+}
+
+async function closePoll() {
+  try {
+    setStatus("Waiting for MetaMask confirmation...");
+    const tx = await contract.closePoll();
+    await tx.wait();
+    await refresh();
+    setStatus("Poll closed.");
+  } catch (e) { console.error(e); setStatus("Close failed: " + errMsg(e)); }
+}
+
+// ===== 7. EVENTS =====
+$("connectButton").addEventListener("click", connectWallet);
+$("closeButton").addEventListener("click", closePoll);
+if (window.ethereum) {
+  window.ethereum.on("accountsChanged", () => window.location.reload());
+  window.ethereum.on("chainChanged", () => window.location.reload());
+}
+</script>
+</body>
+</html>
