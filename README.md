@@ -55,7 +55,7 @@ After setting the variable, you can run the deployment with the Sepolia network:
 ```shell
 npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
 ```
-=======
+
 # KuraChain
 
 A decentralised voting DApp on Ethereum. One wallet, one vote, recorded on the blockchain.
