@@ -34,7 +34,7 @@ A decentralised voting DApp on Ethereum. One wallet, one vote, recorded on the b
 - **MetaMask** for signing transactions
 
 ## Project structure
-
+```
 KuraChain/
 ├── contracts/Voting.sol        Smart contract
 ├── test/Voting.ts              Automated tests
@@ -44,7 +44,7 @@ KuraChain/
 ├── hardhat.config.ts           Compiler, plugins and networks
 ├── .env.example                Template for secrets (copy to .env)
 └── package.json
-
+```
 ## Getting started
 
 Requirements: Node.js 22.13 or later, VS Code (with the Live Server extension), and MetaMask.
